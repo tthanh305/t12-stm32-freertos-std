@@ -5,6 +5,7 @@ Release/
 Objects/
 Listings/
 RTE/
+DebugConfig/
 
 # Compiled Object & Binary files
 *.o
@@ -22,6 +23,7 @@ RTE/
 *.iex
 *.Bak
 *.bak
+*.scvd
 
 # IDE & User-specific files
 *.uvguix.*

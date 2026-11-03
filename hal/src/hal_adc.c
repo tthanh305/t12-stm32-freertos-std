@@ -124,15 +124,22 @@ void hal_adc_init(void)
     ADC_DMACmd(ADC1, ENABLE);
     ADC_Cmd(ADC1, ENABLE);
 
-    /* 7. Thực hiện quy trình tự hiệu chuẩn (Self-Calibration) bắt buộc của STM32F10x */
-    ADC_ResetCalibration(ADC1);
-    while (ADC_GetResetCalibrationStatus(ADC1) != RESET)
+    /* 7. Thực hiện quy trình tự hiệu chuẩn (Self-Calibration) bắt buộc của STM32F10x
+     *    (Có kèm bộ đếm timeout để không bị kẹt khi chạy chế độ mô phỏng Keil Simulator) */
     {
-    }
+        volatile uint32_t calib_timeout = 100000U;
+        ADC_ResetCalibration(ADC1);
+        while ((ADC_GetResetCalibrationStatus(ADC1) != RESET) && (calib_timeout > 0U))
+        {
+            calib_timeout--;
+        }
 
-    ADC_StartCalibration(ADC1);
-    while (ADC_GetCalibrationStatus(ADC1) != RESET)
-    {
+        calib_timeout = 100000U;
+        ADC_StartCalibration(ADC1);
+        while ((ADC_GetCalibrationStatus(ADC1) != RESET) && (calib_timeout > 0U))
+        {
+            calib_timeout--;
+        }
     }
 
     /* 8. Bắt đầu chuyển đổi ADC liên tục bằng phần mềm */
