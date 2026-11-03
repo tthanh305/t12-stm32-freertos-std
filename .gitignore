@@ -1,0 +1,36 @@
+# Build & Output directories
+build/
+Debug/
+Release/
+Objects/
+Listings/
+RTE/
+
+# Compiled Object & Binary files
+*.o
+*.d
+*.crf
+*.lnp
+*.axf
+*.elf
+*.hex
+*.bin
+*.map
+*.lst
+*.dep
+*.htm
+*.iex
+*.Bak
+*.bak
+
+# IDE & User-specific files
+*.uvguix.*
+*.uvoptx
+*.uvgui.*
+*.Administrator
+*.plg
+.settings/
+.vscode/
+.cproject
+.project
+
