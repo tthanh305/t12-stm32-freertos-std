@@ -6,27 +6,47 @@
 
 #include "hal_gpio.h"
 #include "bsp_board.h"
+#include "stm32f10x_gpio.h"
+#include "stm32f10x_rcc.h"
 
 void hal_gpio_init(void)
 {
-    /* TODO [Dev 3]: Cấu hình PA0 (SLEEP), PA1 (VB) và PB5 (EC_SW) ở chế độ GPIO_Mode_IPU */
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+    // Bat clock cho GPIOA va GPIOB
+    RCC_APB2PeriphClockCmd(
+        RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB,
+        ENABLE
+    );
+
+    // Cau hinh PA0 (SLEEP) va PA1 (VB)
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    // Cau hinh PB5 (EC_SW)
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
 }
 
 bool hal_gpio_read_encoder_sw(void)
 {
-    /* TODO [Dev 3]: Trả về (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_5) == Bit_RESET) */
-    return false;
+     return (GPIO_ReadInputDataBit(GPIOB, GPIO_Pin_5)
+            == Bit_RESET);
+
 }
 
 bool hal_gpio_read_sleep_sensor(void)
 {
-    /* TODO [Dev 3]: Đọc trạng thái công tắc rung PA0 */
-    return false;
+    return (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_0)
+            == Bit_SET);
 }
 
 bool hal_gpio_read_stand_vb(void)
 {
-    /* TODO [Dev 3]: Trả về (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_1) == Bit_RESET) */
-    return false;
+    return (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_1)
+            == Bit_RESET);
 }
 
