@@ -52,9 +52,9 @@ extern uint32_t SystemCoreClock;
 #define INCLUDE_uxTaskGetStackHighWaterMark     1
 
 /* =========================================================================
- * 4. SOFTWARE TIMERS
+ * 4. SOFTWARE TIMERS (Tắt để tiết kiệm ~700B RAM Heap do không sử dụng)
  * ========================================================================= */
-#define configUSE_TIMERS                        1
+#define configUSE_TIMERS                        0
 #define configTIMER_TASK_PRIORITY               ( 2 )
 #define configTIMER_QUEUE_LENGTH                5
 #define configTIMER_TASK_STACK_DEPTH            ( configMINIMAL_STACK_SIZE )

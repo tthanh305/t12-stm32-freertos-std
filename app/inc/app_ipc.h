@@ -50,6 +50,10 @@ typedef struct {
     uint16_t sz_temp[4];     /* 4 điểm nhiệt độ hiệu chuẩn ứng với ADC {10, 350, 650, 950} (mặc định: {43, 259, 382, 490}) */
     uint16_t set_temp;       /* Nhiệt độ cài đặt mục tiêu (mặc định: 320°C) */
     uint16_t reserved_pad2;  /* Căn chỉnh 4-byte */
+    uint8_t  boost_temp;     /* Độ tăng nhiệt độ khi Boost (10..100°C, mặc định: 50°C) */
+    uint8_t  boost_time;     /* Thời gian duy trì Boost (0..120s, 0 = OFF, mặc định: 30s) */
+    uint8_t  buzzer_vol;     /* Âm lượng còi báo (0..100%, 0 = OFF, mặc định: 60%) */
+    uint8_t  reserved_pad3;  /* Căn chỉnh 4-byte */
     uint32_t crc32;          /* Mã kiểm tra toàn vẹn dữ liệu Flash */
 } SystemConfig_t;
 
@@ -61,6 +65,7 @@ typedef struct {
     /* --- Trạng thái vận hành & Cờ điều khiển --- */
     bool     t12_switch;          /* 0: Stop (Ngừng nung), 1: Heat (Đang gia nhiệt) */
     bool     zjm_sleep_ts;        /* 0: Bình thường, 1: Đang ở chế độ ngủ hạ nhiệt (Slp) */
+    bool     zjm_boost_ts;        /* 0: Bình thường, 1: Đang ở chế độ gia nhiệt tăng cường (Bst) */
     bool     xp_state;            /* 0: Bình thường, 1: Đang ở màn hình chờ bầu trời sao (SLEEP Zzz...) */
     bool     hfccsz_state;        /* 1: Kích hoạt màn hình Khôi phục cài đặt gốc (Resetting...) */
     bool     oled_cfg_dirty;      /* 1: Báo cho Task_DisplayUI cập nhật lại độ sáng / chiều xoay OLED */
@@ -86,9 +91,11 @@ typedef struct {
     bool     t12_adc_error;       /* Lỗi bão hòa ADC khi đang nung (T12 ADC HIGH) */
     bool     vin_error;           /* Lỗi điện áp nguồn đầu vào thấp (Volt Low) */
 
-    /* --- Bộ đếm thời gian Ngủ & Màn hình chờ (Dev 3 quản lý) --- */
+    /* --- Bộ đếm thời gian Ngủ, Boost & Màn hình chờ (Dev 3 quản lý) --- */
     uint16_t sleep_count;         /* Bộ đếm số giây không chuyển động tay hàn */
     uint16_t sleep_temp_cache;    /* Lưu nhiệt độ set_temp trước khi hạ nhiệt ngủ */
+    uint16_t boost_count;         /* Bộ đếm số giây còn lại của chế độ Boost */
+    uint16_t boost_temp_cache;    /* Lưu nhiệt độ set_temp gốc trước khi cộng Boost */
     uint16_t xp_time_count;       /* Bộ đếm số giây ở trạng thái Stop để bật Screensaver */
     int8_t   xp_x;                /* Tọa độ X chữ SLEEP Zzz... trên màn hình chờ */
     int8_t   xp_y;                /* Tọa độ Y chữ SLEEP Zzz... trên màn hình chờ */
@@ -150,10 +157,25 @@ void app_ipc_init(void);
 
 /**
  * @brief Gửi yêu cầu phát tiếng bíp vào xBuzzerQueue (Non-blocking, an toàn từ mọi Task)
- * @param half_period_us Nửa chu kỳ xung tính bằng micro-giây (tương đương tham số t1 của hàm buzzer cũ)
- * @param cycle_count    Số chu kỳ lặp lại (tương đương tham số t2 của hàm buzzer cũ)
+ * @param half_period_us Nửa chu kỳ xung (us); truyền 0 để chèn khoảng lặng (ms)
+ * @param cycle_count    Số chu kỳ lặp lại (hoặc thời gian nghỉ ms nếu half_period_us == 0)
  */
 void app_buzzer_send(uint16_t half_period_us, uint16_t cycle_count);
+
+/**
+ * @brief Phát âm thanh theo tần số (Hz) và thời lượng (ms), chuẩn hóa cho còi thụ động 2-4kHz
+ */
+void app_buzzer_play(uint16_t freq_hz, uint16_t duration_ms);
+
+/**
+ * @brief Phát tiếng tick xoay Encoder (tự bỏ qua nếu hàng đợi đang có >= 2 âm để tránh kêu trễ)
+ */
+void app_buzzer_tick(uint16_t freq_hz, uint16_t duration_ms);
+
+/**
+ * @brief Chèn khoảng lặng giữa các nốt nhạc (ms)
+ */
+void app_buzzer_pause(uint16_t duration_ms);
 
 /**
  * @brief Khóa quyền truy cập cấu trúc trạng thái chung g_sys_state / g_sys_cfg

@@ -35,15 +35,15 @@ extern "C" {
 #define BSP_T12_TEMP_GPIO_PIN       GPIO_Pin_2
 #define BSP_T12_TEMP_ADC_CHANNEL    ADC_Channel_2
 
-/* PA3 (Pin 13): Đo điện áp nguồn 20V qua cầu phân áp 100K/10K (ADC1_IN3) */
-#define BSP_VOL_RE_GPIO_PORT        GPIOA
-#define BSP_VOL_RE_GPIO_PIN         GPIO_Pin_3
-#define BSP_VOL_RE_ADC_CHANNEL      ADC_Channel_3
-
-/* PA4 (Pin 14): Cảm biến nhiệt độ môi trường bù đầu lạnh TC1047 (ADC1_IN4) */
+/* PA3 (Pin 13): Cảm biến nhiệt độ môi trường bù đầu lạnh TC1047 (ADC1_IN3) */
 #define BSP_TC1047_GPIO_PORT        GPIOA
-#define BSP_TC1047_GPIO_PIN         GPIO_Pin_4
-#define BSP_TC1047_ADC_CHANNEL      ADC_Channel_4
+#define BSP_TC1047_GPIO_PIN         GPIO_Pin_3
+#define BSP_TC1047_ADC_CHANNEL      ADC_Channel_3
+
+/* PA4 (Pin 14): Đo điện áp nguồn 20V qua cầu phân áp 100K/10K (ADC1_IN4) */
+#define BSP_VOL_RE_GPIO_PORT        GPIOA
+#define BSP_VOL_RE_GPIO_PIN         GPIO_Pin_4
+#define BSP_VOL_RE_ADC_CHANNEL      ADC_Channel_4
 
 /* PA6 (Pin 16): Xuất xung PWM gia nhiệt kích Q1 C1815 & MOSFET AO4407A (TIM3_CH1) */
 #define BSP_HEATER_PWM_GPIO_PORT    GPIOA
@@ -63,16 +63,16 @@ extern "C" {
 #define BSP_UART_RX_PIN             GPIO_Pin_10
 
 /* --- CẠNH 4 (Chân 41..46): Cụm Mặt Trước (Rotary Encoder EC11 & OLED I2C1) --- */
-/* PB5 (Pin 41): Nút nhấn của Rotary Encoder EC11 (EC_SW) - Input Pull-Up */
+/* PB7 (Pin 43): Nút nhấn của Rotary Encoder EC11 (EC_SW) - Input Pull-Up */
 #define BSP_EC_SW_GPIO_PORT         GPIOB
 #define BSP_EC_SW_GPIO_CLK          RCC_APB2Periph_GPIOB
-#define BSP_EC_SW_GPIO_PIN          GPIO_Pin_5
+#define BSP_EC_SW_GPIO_PIN          GPIO_Pin_7
 
-/* PB6 (Pin 42) & PB7 (Pin 43): Pha A & Pha B của Encoder EC11 (TIM4_CH1 / TIM4_CH2) */
+/* PB6 (Pin 42) & PB5 (Pin 41): Pha A & Pha B của Encoder EC11 */
 #define BSP_EC_AB_GPIO_PORT         GPIOB
 #define BSP_EC_AB_GPIO_CLK          RCC_APB2Periph_GPIOB
 #define BSP_EC_CLK_PIN              GPIO_Pin_6
-#define BSP_EC_DT_PIN               GPIO_Pin_7
+#define BSP_EC_DT_PIN               GPIO_Pin_5
 
 /* PB8 (Pin 45) & PB9 (Pin 46): Màn hình OLED SSD1306 128x32 (I2C1 Remap) */
 #define BSP_OLED_I2C_GPIO_PORT      GPIOB
