@@ -1,6 +1,6 @@
 /**
  * @file    hal_adc.c
- * @brief   Driver ADC1 + DMA1_Channel1 quét 3 kênh (PA2: T12_TEMP, PA3: VOL_RE, PA4: TC1047)
+ * @brief   Driver ADC1 + DMA1_Channel1 quét 3 kênh (PA2: T12_TEMP, PA4: VOL_RE, PA3: TC1047)
  *          sử dụng Thư viện chuẩn STM32F10x Standard Peripheral Library (STD/SPL v3.5.0)
  * @author  Dev 1 (Leader) — Nhánh feature/hal-timer-adc
  * @note    Tham chiếu nguyên bản: analogRead.ino (v1.20)
@@ -15,13 +15,20 @@
 
 /* Số mẫu lấy trung bình cho mỗi kênh (giống hệt vòng lặp 16 mẫu trong denoiseAnalog() gốc) */
 #define HAL_ADC_SAMPLE_COUNT        ( 16U )
-#define HAL_ADC_CHANNEL_COUNT       ( 3U )
+#define HAL_ADC_CHANNEL_COUNT       ( 4U )
 #define HAL_ADC_DMA_BUF_LEN         ( HAL_ADC_SAMPLE_COUNT * HAL_ADC_CHANNEL_COUNT )
 
-/* Chỉ mục kênh trong mảng DMA thứ tự Rank 1..3 */
+/* Chỉ mục kênh trong mảng DMA thứ tự Rank 1..4 */
 #define HAL_ADC_IDX_T12_TEMP        ( 0U ) /* Rank 1: PA2 (ADC_Channel_2) */
-#define HAL_ADC_IDX_VOL_RE          ( 1U ) /* Rank 2: PA3 (ADC_Channel_3) */
-#define HAL_ADC_IDX_TC1047          ( 2U ) /* Rank 3: PA4 (ADC_Channel_4) */
+#define HAL_ADC_IDX_VOL_RE          ( 1U ) /* Rank 2: PA4 (ADC_Channel_4) */
+#define HAL_ADC_IDX_TC1047          ( 2U ) /* Rank 3: PA3 (ADC_Channel_3) */
+#define HAL_ADC_IDX_VREFINT         ( 3U ) /* Rank 4: Nội bộ VREFINT (ADC_Channel_17 ~ 1.20V) */
+
+/* Điện áp chuẩn nội VREFINT của STM32F103 (V) và ngưỡng kiểm tra hợp lệ 12-bit */
+#define HAL_ADC_VREFINT_TYP_V       ( 1.20f )
+#define HAL_ADC_12BIT_MAX           ( 4095.0f )
+#define HAL_ADC_VREF_RAW_MIN        ( 1100.0f )
+#define HAL_ADC_VREF_RAW_MAX        ( 1900.0f )
 
 /* Tỉ lệ cầu phân áp đo nguồn 20V (VOL_RE):
  * - Thiết kế chuẩn 3.3V (R8 = 100K, R10 = 10K): 10 / (100 + 10) = 1 / 11 ≈ 0.090909f
@@ -112,15 +119,17 @@ void hal_adc_init(void)
     ADC_InitStructure.ADC_NbrOfChannel       = HAL_ADC_CHANNEL_COUNT;
     ADC_Init(ADC1, &ADC_InitStructure);
 
-    /* 5. Thiết lập thứ tự quét (Rank 1..3) và thời gian lấy mẫu dài nhất (239.5 chu kỳ)
-     *    để tụ lấy mẫu nội nạp đầy và triệt tiêu nhiễu cao tần trên đường cặp nhiệt điện:
+    /* 5. Thiết lập thứ tự quét (Rank 1..4) và thời gian lấy mẫu dài nhất (239.5 chu kỳ)
+     *    để tụ lấy mẫu nội nạp đầy (đạt chuẩn >= 17.1us cho VREFINT) và triệt tiêu nhiễu:
      *    Thời gian chuyển đổi 1 kênh = (239.5 + 12.5) / 12MHz = 21 us
-     *    -> Quét 3 kênh x 16 mẫu chỉ mất ~1.0 ms! */
+     *    -> Quét 4 kênh x 16 mẫu chỉ mất ~1.34 ms! */
     ADC_RegularChannelConfig(ADC1, BSP_T12_TEMP_ADC_CHANNEL, 1U, ADC_SampleTime_239Cycles5);
     ADC_RegularChannelConfig(ADC1, BSP_VOL_RE_ADC_CHANNEL,   2U, ADC_SampleTime_239Cycles5);
     ADC_RegularChannelConfig(ADC1, BSP_TC1047_ADC_CHANNEL,   3U, ADC_SampleTime_239Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_17,           4U, ADC_SampleTime_239Cycles5);
 
-    /* 6. Bật kết nối DMA cho ADC1 và bật nguồn ADC1 */
+    /* 6. Bật kênh nội VREFINT (ADC_Channel_17), kết nối DMA cho ADC1 và bật nguồn ADC1 */
+    ADC_TempSensorVrefintCmd(ENABLE);
     ADC_DMACmd(ADC1, ENABLE);
     ADC_Cmd(ADC1, ENABLE);
 
@@ -154,10 +163,10 @@ float hal_adc_read_t12_scaled(void)
 
 float hal_adc_read_vin(float vcc_ref, float vin_offset)
 {
-    /* Đọc giá trị trung bình thang 10-bit của kênh đo áp nguồn PA3 */
+    /* Đọc giá trị trung bình thang 10-bit của kênh đo áp nguồn PA4 */
     float adc_10bit = prv_adc_get_channel_scaled_10bit(HAL_ADC_IDX_VOL_RE);
 
-    /* Tính điện áp tại chân PA3: V_pin = (adc_10bit / 1023.0f) * vcc_ref
+    /* Tính điện áp tại chân PA4: V_pin = (adc_10bit / 1023.0f) * vcc_ref
      * Suy ra điện áp nguồn 20V: Vin = (V_pin / HAL_ADC_VIN_DIVIDER_RATIO) + vin_offset
      * (Tương đương công thức gốc trong analogRead.ino: (denoiseAnalog(vin_pin) / ratio) * vcc_refer_fl + vin_refer) */
     float v_pin = (adc_10bit * vcc_ref) / HAL_ADC_10BIT_MAX;
@@ -166,11 +175,42 @@ float hal_adc_read_vin(float vcc_ref, float vin_offset)
 
 float hal_adc_read_tc1047(float vcc_ref)
 {
-    /* Đọc giá trị trung bình thang 10-bit của kênh cảm biến nhiệt độ phòng TC1047 (PA4) */
+    /* Đọc giá trị trung bình thang 10-bit của kênh cảm biến nhiệt độ phòng LM35 (PA3) */
     float adc_10bit = prv_adc_get_channel_scaled_10bit(HAL_ADC_IDX_TC1047);
 
-    /* Tính điện áp ngõ ra TC1047 (V): V_out = (adc_10bit / 1023.0f) * vcc_ref
-     * Đặc tuyến TC1047: 10mV/°C, tại 0°C xuất 0.5V -> Temp (°C) = (V_out - 0.5f) * 100.0f */
+    /* Tính điện áp ngõ ra LM35 (V): V_out = (adc_10bit / 1023.0f) * vcc_ref
+     * Đặc tuyến LM35: 10mV/°C, tại 0°C xuất 0.0V -> Temp (°C) = V_out * 100.0f */
     float v_out = (adc_10bit * vcc_ref) / HAL_ADC_10BIT_MAX;
-    return (v_out - 0.5f) * 100.0f;
+    return v_out * 100.0f;
+}
+
+float hal_adc_read_vdda(void)
+{
+    uint32_t sum_12bit = 0U;
+    uint8_t  i;
+    float    vref_raw_12bit;
+    float    vdda;
+
+    for (i = 0U; i < HAL_ADC_SAMPLE_COUNT; i++)
+    {
+        sum_12bit += (uint32_t)s_adc_dma_buf[i][HAL_ADC_IDX_VREFINT];
+    }
+
+    vref_raw_12bit = (float)sum_12bit / (float)HAL_ADC_SAMPLE_COUNT;
+    if ((vref_raw_12bit < HAL_ADC_VREF_RAW_MIN) || (vref_raw_12bit > HAL_ADC_VREF_RAW_MAX))
+    {
+        return 0.0f;
+    }
+
+    vdda = (HAL_ADC_VREFINT_TYP_V * HAL_ADC_12BIT_MAX) / vref_raw_12bit;
+    if (vdda < 3.00f)
+    {
+        vdda = 3.00f;
+    }
+    else if (vdda > 3.60f)
+    {
+        vdda = 3.60f;
+    }
+
+    return vdda;
 }

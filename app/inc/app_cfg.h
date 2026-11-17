@@ -32,7 +32,7 @@
  * 3. CHU KỲ THỰC THI CÁC TASK ĐỊNH KỲ (ĐƠN VỊ: MS)
  * ========================================================================= */
 #define TASK_INPUT_SLEEP_PERIOD_MS  ( 20U )  /* Quét phím & Encoder mỗi 20ms (50Hz) */
-#define TASK_DISPLAY_UI_PERIOD_MS   ( 30U )  /* Làm tươi màn hình OLED mỗi 30ms (~33 FPS) */
+#define TASK_DISPLAY_UI_PERIOD_MS   ( 30U )  /* Làm tươi màn hình OLED mỗi 30ms (~33 FPS, đủ quỹ thời gian I2C 400kHz) */
 #define TASK_DEBUG_UART_PERIOD_MS   ( 100U ) /* Truyền Telemetry lên PC mỗi 100ms (10Hz) */
 
 /* =========================================================================

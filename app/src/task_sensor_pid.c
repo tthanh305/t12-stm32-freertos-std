@@ -21,6 +21,7 @@
 #define T12_ADC_ERROR_MAX_COUNT     ( 10U )     /* Số chu kỳ liên tiếp bão hòa ADC để ngắt khẩn cấp */
 #define T12_OPAMP_SETTLE_MS         ( 4U )      /* Thời gian chờ Op-Amp LMV321 xả điện sau khi ngắt PWM */
 #define TASK_BASE_TICK_MS           ( 50U )     /* Chu kỳ nhịp cơ sở kiểm tra trạng thái & làm tươi IWDG */
+#define T12_TEMP_AVG_WINDOW         ( 8U )      /* Kích thước cửa sổ trung bình trượt nhiệt độ mũi hàn */
 
 /* Hằng số bộ điều khiển PID gia tăng (từ v1.20.ino & PID.ino) */
 #define PID_DEADBAND                ( 0.0f )    /* Vùng chết sai số (deadband = 0) */
@@ -37,7 +38,13 @@ static uint8_t  s_vin_cache_count         = 0U;
 static float    s_tc1047_cache            = 0.0f;
 static uint8_t  s_tc1047_cache_count      = 0U;
 
-static int32_t  s_t12_temp_avg_cache      = 0;
+static float    s_vdda_cache              = 0.0f;
+static uint8_t  s_vdda_cache_count        = 0U;
+static bool     s_vdda_inited             = false;
+
+static int16_t  s_t12_temp_ring[T12_TEMP_AVG_WINDOW];
+static int32_t  s_t12_temp_avg_sum        = 0;
+static uint8_t  s_t12_temp_avg_idx        = 0U;
 static uint8_t  s_t12_temp_avg_count      = 0U;
 static uint8_t  s_t12_adc_error_count     = 0U;
 
@@ -85,7 +92,44 @@ static float prv_get_factor(float ek0, float absmax, float absmin)
 }
 
 /**
- * @brief Đọc điện áp nguồn DCIN (PA3), lấy trung bình 10 mẫu và kiểm tra bảo vệ áp thấp (Volt Low)
+ * @brief Tự động hiệu chuẩn điện áp tham chiếu VDDA qua kênh nội VREFINT (ADC_Channel_17)
+ */
+static void prv_vdda_read(void)
+{
+    float vdda_sample;
+
+    /* Không ghi đè nếu người dùng đang chỉnh tay trong Menu Power -> Ref. Voltage */
+    if ((g_sys_state.display_count == UI_SCREEN_SZJM_POWER) &&
+        (g_sys_state.szjm_power_sxxk_count == 1))
+    {
+        return;
+    }
+
+    vdda_sample = hal_adc_read_vdda();
+    if (vdda_sample <= 0.0f)
+    {
+        return;
+    }
+
+    if (!s_vdda_inited)
+    {
+        g_sys_cfg.vcc_refer = vdda_sample;
+        s_vdda_inited       = true;
+    }
+
+    s_vdda_cache += vdda_sample;
+    s_vdda_cache_count++;
+
+    if (s_vdda_cache_count >= SENSOR_AVG_CYCLES)
+    {
+        g_sys_cfg.vcc_refer = s_vdda_cache / (float)SENSOR_AVG_CYCLES;
+        s_vdda_cache_count  = 0U;
+        s_vdda_cache        = 0.0f;
+    }
+}
+
+/**
+ * @brief Đọc điện áp nguồn DCIN (PA4), lấy trung bình 10 mẫu và kiểm tra bảo vệ áp thấp (Volt Low)
  *        (Chuyển đổi từ hàm vin_read() trong analogRead.ino)
  */
 static void prv_vin_read(void)
@@ -115,7 +159,7 @@ static void prv_vin_read(void)
 }
 
 /**
- * @brief Đọc cảm biến nhiệt độ vỏ máy TC1047 (PA4), lấy trung bình 10 mẫu để bù đầu lạnh
+ * @brief Đọc cảm biến nhiệt độ vỏ máy TC1047 (PA3), lấy trung bình 10 mẫu để bù đầu lạnh
  *        (Chuyển đổi từ hàm tc1047_temp_read() trong analogRead.ino)
  */
 static void prv_tc1047_temp_read(void)
@@ -287,10 +331,12 @@ static void prv_pid_execute(void)
     {
         int16_t ek_average = (int16_t)g_sys_cfg.set_temp - g_sys_state.t12_temp_avg;
 
-        /* Phát tiếng bíp báo hiệu mũi hàn đã đạt nhiệt độ mục tiêu (sai số trung bình nằm trong [-3..+3°C]) */
+        /* Phát âm báo 2 nốt A6 -> C7 khi mũi hàn đạt nhiệt độ mục tiêu (sai số trong [-3..+3°C]) */
         if ((ek_average >= -3) && (ek_average <= 3) && (!s_buzzer_temp_avg_state))
         {
-            app_buzzer_send(120U, 300U);
+            app_buzzer_play(1760U, 75U);
+            app_buzzer_pause(30U);
+            app_buzzer_play(2093U, 130U);
             s_buzzer_temp_avg_state = true;
         }
 
@@ -340,14 +386,10 @@ static void prv_read_t12_temp_and_control(void)
     /* 3. Chiếm Mutex cập nhật dữ liệu cảm biến và tính toán PID */
     if (app_state_lock(10U))
     {
-        /* 3.1. Đọc điện áp nguồn DCIN, nhiệt độ phòng TC1047 và kiểm tra cờ cập nhật độ sáng OLED */
+        /* 3.1. Tự động hiệu chuẩn VDDA qua VREFINT, sau đó đọc DCIN và nhiệt độ phòng LM35 */
+        prv_vdda_read();
         prv_vin_read();
         prv_tc1047_temp_read();
-        if ((g_sys_state.display_count == UI_SCREEN_SZJM_OLED) &&
-            (g_sys_state.szjm_oled_sxxk_count == 1))
-        {
-            g_sys_state.oled_cfg_dirty = true;
-        }
 
         /* 3.2. Đọc giá trị ADC mũi hàn đã quy đổi về thang 10-bit (0.0 .. 1023.75) và lọc thông thấp IIR */
         t12_ad_new          = hal_adc_read_t12_scaled();
@@ -363,15 +405,22 @@ static void prv_read_t12_temp_and_control(void)
                   + (g_sys_state.tc1047_temp - (float)g_sys_cfg.tc1047_refer);
         g_sys_state.t12_temp = (int16_t)temp_calc;
 
-        /* 3.4. Tính nhiệt độ trung bình mỗi 8 chu kỳ đo (phục vụ làm mượt hiển thị & kiểm tra đạt nhiệt) */
-        s_t12_temp_avg_cache += (int32_t)g_sys_state.t12_temp;
-        s_t12_temp_avg_count++;
-        if (s_t12_temp_avg_count >= 8U)
+        /* 3.4. Tính nhiệt độ trung bình trượt 8 mẫu (Sliding Window) để làm mượt liên tục không bị khựng */
+        if (s_t12_temp_avg_count < T12_TEMP_AVG_WINDOW)
         {
-            g_sys_state.t12_temp_avg = (int16_t)(s_t12_temp_avg_cache >> 3);
-            s_t12_temp_avg_cache     = 0;
-            s_t12_temp_avg_count     = 0U;
+            s_t12_temp_ring[s_t12_temp_avg_idx] = g_sys_state.t12_temp;
+            s_t12_temp_avg_sum                 += (int32_t)g_sys_state.t12_temp;
+            s_t12_temp_avg_count++;
+            g_sys_state.t12_temp_avg = (int16_t)(s_t12_temp_avg_sum / (int32_t)s_t12_temp_avg_count);
         }
+        else
+        {
+            s_t12_temp_avg_sum                 -= (int32_t)s_t12_temp_ring[s_t12_temp_avg_idx];
+            s_t12_temp_ring[s_t12_temp_avg_idx] = g_sys_state.t12_temp;
+            s_t12_temp_avg_sum                 += (int32_t)g_sys_state.t12_temp;
+            g_sys_state.t12_temp_avg = (int16_t)(s_t12_temp_avg_sum / (int32_t)T12_TEMP_AVG_WINDOW);
+        }
+        s_t12_temp_avg_idx = (uint8_t)((s_t12_temp_avg_idx + 1U) % T12_TEMP_AVG_WINDOW);
 
         /* 3.5. Thực thi bộ điều khiển PID và xuất xung PWM mới */
         prv_pid_execute();

@@ -31,8 +31,8 @@ TaskHandle_t      xTaskDebugUartHandle  = NULL;
 
 void app_ipc_init(void)
 {
-    /* 1. Tạo hàng đợi chứa tối đa 8 yêu cầu phát tiếng bíp liên tiếp */
-    xBuzzerQueue = xQueueCreate(8U, sizeof(BuzzerMsg_t));
+    /* 1. Tạo hàng đợi chứa tối đa 16 yêu cầu phát âm thanh / khoảng nghỉ liên tiếp */
+    xBuzzerQueue = xQueueCreate(16U, sizeof(BuzzerMsg_t));
     configASSERT(xBuzzerQueue != NULL);
 
     /* 2. Tạo Mutex bảo vệ cấu trúc trạng thái chung g_sys_state & g_sys_cfg */
@@ -59,6 +59,46 @@ void app_buzzer_send(uint16_t half_period_us, uint16_t cycle_count)
         msg.cycle_count    = cycle_count;
         /* Gửi không chờ (timeout = 0) để không bao giờ làm khựng Task gọi */
         (void)xQueueSend(xBuzzerQueue, &msg, 0U);
+    }
+}
+
+void app_buzzer_play(uint16_t freq_hz, uint16_t duration_ms)
+{
+    uint16_t half_period_us;
+    uint16_t cycles;
+
+    if (freq_hz < 200U)
+    {
+        freq_hz = 200U;
+    }
+    if (duration_ms == 0U)
+    {
+        return;
+    }
+
+    half_period_us = (uint16_t)(500000UL / (uint32_t)freq_hz);
+    cycles         = (uint16_t)(((uint32_t)freq_hz * (uint32_t)duration_ms) / 1000UL);
+    if (cycles == 0U)
+    {
+        cycles = 1U;
+    }
+
+    app_buzzer_send(half_period_us, cycles);
+}
+
+void app_buzzer_tick(uint16_t freq_hz, uint16_t duration_ms)
+{
+    if ((xBuzzerQueue != NULL) && (uxQueueMessagesWaiting(xBuzzerQueue) < 2U))
+    {
+        app_buzzer_play(freq_hz, duration_ms);
+    }
+}
+
+void app_buzzer_pause(uint16_t duration_ms)
+{
+    if (duration_ms > 0U)
+    {
+        app_buzzer_send(0U, duration_ms);
     }
 }
 

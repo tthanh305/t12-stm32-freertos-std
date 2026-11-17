@@ -16,7 +16,7 @@ extern "C" {
 
 /**
  * @brief Khởi tạo ADC1 (Scan Mode + Continuous Mode) kết hợp DMA1_Channel1 (Circular Mode)
- *        quét 3 kênh PA2 (ADC_Channel_2), PA3 (ADC_Channel_3), PA4 (ADC_Channel_4)
+ *        quét 3 kênh PA2 (ADC_Channel_2), PA4 (ADC_Channel_4), PA3 (ADC_Channel_3)
  *        vào mảng đệm 16 mẫu x 3 kênh.
  */
 void hal_adc_init(void);
@@ -29,7 +29,7 @@ void hal_adc_init(void);
 float hal_adc_read_t12_scaled(void);
 
 /**
- * @brief Đọc và tính toán điện áp nguồn đầu vào DCIN 20V (PA3) qua cầu phân áp R8=100K / R10=10K
+ * @brief Đọc và tính toán điện áp nguồn đầu vào DCIN 20V (PA4) qua cầu phân áp R8=100K / R10=10K
  * @param vcc_ref    Điện áp tham chiếu VDDA (mặc định 3.30V)
  * @param vin_offset Giá trị bù sai số điện áp nguồn (vin_refer)
  * @return Điện áp nguồn DCIN tính bằng Volt (V)
@@ -37,11 +37,17 @@ float hal_adc_read_t12_scaled(void);
 float hal_adc_read_vin(float vcc_ref, float vin_offset);
 
 /**
- * @brief Đọc và tính toán nhiệt độ môi trường từ cảm biến TC1047 (PA4: 10mV/°C, 0.5V tại 0°C)
+ * @brief Đọc và tính toán nhiệt độ môi trường từ cảm biến LM35 (PA3: 10mV/°C, 0V tại 0°C)
  * @param vcc_ref Điện áp tham chiếu VDDA (mặc định 3.30V)
  * @return Nhiệt độ môi trường tính bằng độ C (°C)
  */
 float hal_adc_read_tc1047(float vcc_ref);
+
+/**
+ * @brief Tự động đo điện áp tham chiếu VDDA thực tế thông qua kênh nội VREFINT (ADC_Channel_17 ~ 1.20V)
+ * @return Điện áp VDDA thực tế tính bằng Volt (3.00V .. 3.60V), hoặc 0.0f nếu giá trị VREFINT ngoài dải hợp lệ
+ */
+float hal_adc_read_vdda(void);
 
 #ifdef __cplusplus
 }
