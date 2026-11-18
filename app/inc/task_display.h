@@ -9,6 +9,7 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "u8g2.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -20,6 +21,14 @@ extern "C" {
  * @return pdPASS nếu tạo Task thành công
  */
 BaseType_t task_display_create(void);
+
+/* Đối tượng U8g2 dùng chung giữa task_display.c, ui_main.c và ui_menu.c */
+extern u8g2_t g_u8g2;
+
+/* Tiện ích vẽ số không dùng sprintf, dùng chung cho các màn hình UI */
+void ui_draw_int(u8g2_uint_t x, u8g2_uint_t y, int32_t val);
+void ui_draw_float(u8g2_uint_t x, u8g2_uint_t y, float val, uint8_t decimals);
+int16_t ui_get_trans_y(void);
 
 /* Các hàm vẽ giao diện con (được cài đặt trong ui_main.c và ui_menu.c bởi Dev 2) */
 void ui_boot_screen(void);      /* Màn hình khởi động kj_display() */
